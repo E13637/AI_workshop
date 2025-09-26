@@ -1,1 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Coffee Shop – Live Orders Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          boxShadow: {
+            soft: '0 10px 25px -10px rgba(0,0,0,0.25)',
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+  </style>
+</head>
+<body class="min-h-screen bg-zinc-50 text-zinc-900">
+  <!-- App Shell -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-zinc-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-2xl bg-zinc-900 text-white flex items-center justify-center shadow-soft">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path d="M3 8a1 1 0 0 1 1-1h12a4 4 0 1 1 0 8H5a1 1 0 0 1-1-1V8Zm16 1h-1v4h1a2 2 0 1 0 0-4ZM4 18h14a1 1 0 1 1 0 2H4a1 1 0 1 1 0-2Z"/></svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-semibold leading-tight">Live Orders Dashboard</h1>
+          <p class="text-xs text-zinc-500">Manage orders, track performance, and spot issues in real time.</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="addOneBtn" class="px-3 py-2 text-sm rounded-xl bg-zinc-900 text-white hover:opacity-95 active:scale-[.98] transition">Add Demo Order</button>
+        <button id="addFiveBtn" class="px-3 py-2 text-sm rounded-xl bg-zinc-100 hover:bg-zinc-200 active:scale-[.98] transition">+5 Orders</button>
 
+        <button id="uploadCsvBtn" class="px-3 py-2 text-sm rounded-xl bg-emerald-600 text-white hover:opacity-95 active:scale-[.98] transition">Upload CSV</button>
+        <input id="csvInput" type="file" accept=".csv" class="hidden" />
+
+        <button id="resetBtn" class="px-3 py-2 text-sm rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 active:scale-[.98] transition">Reset Data</button>
+
+        <div class="hidden sm:flex items-center gap-2 ml-2">
+          <label for="refreshSelect" class="text-xs text-zinc-500">Auto-Refresh</label>
+          <select id="refreshSelect" class="px-2 py-1 text-sm rounded-lg border border-zinc-300 bg-white">
+            <option value="off">Off</option>
+            <option value="5">Every 5s</option>
+            <option value="10">Every 10s</option>
+            <option value="30">Every 30s</option>
+            <option value="60">Every 60s</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+    <!-- Import banner (shown after CSV uploads) -->
+    <div id="importBanner" class="hidden rounded-2xl border border-zinc-200 bg-white p-4 shadow-soft"></div>
+
+    <!-- Summary Bar -->
+    <section id="summaryBar" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></section>
+
+    <!-- Alerts Panel & Assistant -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div class="lg:col-span-2">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-lg font-semibold">Orders</h2>
+          <div class="flex items-center gap-2">
+            <input id="searchInput" type="text" placeholder="Search by name or item..." class="px-3 py-2 text-sm rounded-xl border border-zinc-300 bg-white w-56"/>
+            <select id="statusFilter" class="px-3 py-2 text-sm rounded-xl border border-zinc-300 bg-white">
+              <option value="all">All statuses</option>
+              <option value="waiting">Waiting</option>
+              <option value="in_progress">In Progress</option>
+              <option value="ready">Ready</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+        <div id="ordersGrid" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+      </div>
+      <div class="space-y-4">
+        <div class="p-4 rounded-2xl bg-white border border-zinc-200 shadow-soft">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-6 h-6 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M11 3a1 1 0 0 1 .894.553l8 16A1 1 0 0 1 19 21H5a1 1 0 0 1-.894-1.447l8-16A1 1 0 0 1 11 3Zm0 5a1 1 0 0 0-1 1v4a1 1 0 1 0 2 0V9a1 1 0 0 0-1-1Zm0 8a1 1 0 1 0 0 2h.01A1 1 0 1 0 11 16Z"/></svg>
+            </div>
+            <h3 class="font-semibold">Alerts</h3>
+          </div>
+          <ul id="alertsList" class="space-y-2 text-sm"></ul>
+        </div>
+        <div class="p-4 rounded-2xl bg-white border border-zinc-200 shadow-soft">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M12 2a1 1 0 0 1 .894.553l8 16A1 1 0 0 1 20 20H4a1 1 0 0 1-.894-1.447l8-16A1 1 0 0 1 12 2Zm0 5a1 1 0 0 0-1 1v3a1 1 0 1 0 2 0V8a1 1 0 0 0-1-1Zm0 8a1 1 0 1 0 0 2h.01A1 1 0 1 0 12 15Z"/></svg>
+            </div>
+            <h3 class="font-semibold">Smart Assistant</h3>
+          </div>
+          <div id="assistantSuggestions" class="space-y-2 text-sm"></div>
+          <button id="refreshAssistantBtn" class="mt-3 w-full px-3 py-2 text-sm rounded-xl bg-zinc-100 hover:bg-zinc-200">Refresh Suggestions</button>
+        </div>
+        <div class="p-4 rounded-2xl bg-white border border-zinc-200 shadow-soft">
+          <h3 class="font-semibold mb-2">Auto-Refresh</h3>
+          <p class="text-sm text-zinc-600">Automatically progresses orders from <span class="font-medium">Waiting → In Progress → Ready</span> based on age and load.</p>
+          <div class="mt-3 flex items-center gap-2">
+            <label class="text-sm text-zinc-500" for="refreshSelectAside">Interval</label>
+            <select id="refreshSelectAside" class="px-3 py-2 text-sm rounded-xl border border-zinc-300 bg-white">
+              <option value="off">Off</option>
+              <option value="5">Every 5s</option>
+              <option value="10">Every 10s</option>
+              <option value="30">Every 30s</option>
+              <option value="60">Every 60s</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="pt-4 text-center text-xs text-zinc-500">© <span id="year"></span> Coffee Shop Manager • Demo Dashboard</footer>
+  </main>
+
+  <template id="orderCardTpl">
+    <div class="order-card p-4 rounded-2xl bg-white border border-zinc-200 shadow-soft flex flex-col gap-3">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h4 class="customer text-base font-semibold"></h4>
+          <p class="meta text-xs text-zinc-500"></p>
+        </div>
+        <span class="status px-2 py-1 text-xs rounded-full"></span>
+      </div>
+      <ul class="items text-sm list-disc pl-5 space-y-1"></ul>
+      <div class="flex items-center justify-between text-sm">
+        <span class="payment px-2 py-1 rounded-lg bg-zinc-100"></span>
+        <span class="total font-medium"></span>
+      </div>
+      <div class="flex items-center gap-2 pt-1">
+        <button class="btn-start hidden px-3 py-2 text-sm rounded-xl bg-blue-600 text-white hover:opacity-95">Start</button>
+        <button class="btn-ready hidden px-3 py-2 text-sm rounded-xl bg-emerald-600 text-white hover:opacity-95">Mark Ready</button>
+        <button class="btn-cancel px-3 py-2 text-sm rounded-xl bg-red-50 text-red-700 border border-red-200 hover:bg-red-100">Cancel</button>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    /**********************
+     * Data & Utilities   *
+     **********************/
+    const MENU = {
+      drinks: [
+        { name: 'Espresso', price: 3.0 },
+        { name: 'Americano', price: 3.5 },
+        { name: 'Cappuccino', price: 4.0 },
+        { name: 'Latte', price: 4.5 },
+        { name: 'Mocha', price: 4.8 },
+        { name: 'Flat White', price: 4.2 },
+        { name: 'Iced Latte', price: 4.7 },
+        { name: 'Cold Brew', price: 4.6 },
+        { name: 'Matcha Latte', price: 4.9 },
+      ],
+      pastries: [
+        { name: 'Croissant', price: 2.8 },
+        { name: 'Chocolate Croissant', price: 3.2 },
+        { name: 'Cinnamon Roll', price: 3.1 },
+        { name: 'Blueberry Muffin', price: 2.9 },
+        { name: 'Banana Bread', price: 3.0 },
+        { name: 'Almond Danish', price: 3.4 },
+      ],
+      snacks: [
+        { name: 'Ham & Cheese Sandwich', price: 5.5 },
+        { name: 'Veggie Wrap', price: 5.2 },
+        { name: 'Granola Bar', price: 1.8 },
+        { name: 'Yogurt Parfait', price: 3.6 },
+      ],
+    }
+
+    const PAYMENT_METHODS = ['Cash','Card','UPI','Wallet']
+    const STATUSES = ['waiting','in_progress','ready','cancelled']
+
+    const fmtCurrency = (n) => `$${n.toFixed(2)}`
+    const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const minutesAgo = (ts) => Math.floor((Date.now() - ts) / 60000)
+
+    let autoId = 1
+    const newId = () => `O${String(autoId++).padStart(4,'0')}`
+
+    /** State */
+    let orders = []
+    const defaultSeedCount = 9
+
+    /**********************
+     * Demo Data          *
+     **********************/
+    function randomItem(arr){ return arr[Math.floor(Math.random()*arr.length)] }
+    function randomName(){
+      const first = ['Alex','Sam','Taylor','Jordan','Casey','Riley','Ava','Leo','Maya','Noah','Isha','Kiran','Priya','Arun','Zara','Mila','Omar','Jai','Neha','Sara']
+      const last = ['P.','R.','M.','K.','D.','S.','T.','V.','L.','N.']
+      return `${randomItem(first)} ${randomItem(last)}`
+    }
+    function buildRandomOrder(){
+      const id = newId()
+      const itemCount = Math.floor(Math.random()*5)+1
+      const categories = Object.keys(MENU)
+      const items = []
+      for(let i=0;i<itemCount;i++){
+        const cat = randomItem(categories)
+        const menuItem = randomItem(MENU[cat])
+        const qty = Math.random() < 0.7 ? 1 : 2
+        items.push({ name: menuItem.name, price: menuItem.price, qty })
+      }
+      const ts = Date.now() - (Math.floor(Math.random()*20))*60000
+      const status = Math.random() < 0.6 ? 'waiting' : (Math.random() < 0.7 ? 'in_progress' : 'ready')
+      const payment = randomItem(PAYMENT_METHODS)
+      return { id, customer: randomName(), items, status, payment, ts }
+    }
+
+    function seedOrders(n=8){
+      for(let i=0;i<n;i++) orders.push(buildRandomOrder())
+    }
+
+    /**********************
+     * Rendering          *
+     **********************/
+    function render(){
+      renderSummary()
+      renderOrders()
+      renderAlerts()
+      renderAssistant()
+    }
+
+    function renderSummary(){
+      const totalOrders = orders.length
+      const ready = orders.filter(o=>o.status==='ready').length
+      const pending = orders.filter(o=>o.status==='waiting' || o.status==='in_progress').length
+      const revenue = orders.filter(o=>o.status!=='cancelled').reduce((sum,o)=>sum+orderTotal(o),0)
+
+      const cards = [
+        { label:'Total Orders', value: totalOrders },
+        { label:'Ready', value: ready },
+        { label:'Pending', value: pending },
+        { label:'Revenue (Today)', value: fmtCurrency(revenue) },
+      ]
+      const container = document.getElementById('summaryBar')
+      container.innerHTML = cards.map(c=>`
+        <div class="p-4 rounded-2xl bg-white border border-zinc-200 shadow-soft">
+          <div class="text-xs text-zinc-500">${c.label}</div>
+          <div class="mt-1 text-2xl font-semibold">${c.value}</div>
+        </div>`).join('')
+    }
+
+    function statusPill(status){
+      const map = { waiting:['bg-amber-100 text-amber-700','Waiting'], in_progress:['bg-blue-100 text-blue-700','In Progress'], ready:['bg-emerald-100 text-emerald-700','Ready'], cancelled:['bg-red-100 text-red-700','Cancelled'] }
+      const [cls, label] = map[status] || ['bg-zinc-100','—']
+      return `<span class="px-2 py-1 text-xs rounded-full ${cls}">${label}</span>`
+    }
+
+    function orderTotal(o){
+      if(typeof o.price_total === 'number' && !Number.isNaN(o.price_total)) return o.price_total
+      return o.items.reduce((s,it)=> s + it.price * it.qty, 0)
+    }
+
+    function renderOrders(){
+      const grid = document.getElementById('ordersGrid')
+      const search = document.getElementById('searchInput').value.toLowerCase()
+      const filter = document.getElementById('statusFilter').value
+
+      const filtered = orders.filter(o=>{
+        const matchesText = o.customer.toLowerCase().includes(search) || o.items.some(it=>it.name.toLowerCase().includes(search))
+        const matchesStatus = (filter==='all') || o.status===filter
+        return matchesText && matchesStatus
+      })
+
+      grid.innerHTML = ''
+      const tpl = document.getElementById('orderCardTpl')
+      filtered.sort((a,b)=> a.ts - b.ts)
+      filtered.forEach(o=>{
+        const node = tpl.content.cloneNode(true)
+        node.querySelector('.customer').textContent = `${o.customer} • ${o.id}`
+        node.querySelector('.meta').textContent = `${fmtTime(o.ts)} • ${minutesAgo(o.ts)}m ago`
+        node.querySelector('.status').outerHTML = statusPill(o.status)
+
+        const ul = node.querySelector('.items')
+        o.items.forEach(it=>{
+          const li = document.createElement('li')
+          li.textContent = `${it.name} × ${it.qty}`
+          ul.appendChild(li)
+        })
+        node.querySelector('.payment').textContent = o.payment
+        node.querySelector('.total').textContent = fmtCurrency(orderTotal(o))
+
+        const startBtn = node.querySelector('.btn-start')
+        const readyBtn = node.querySelector('.btn-ready')
+        const cancelBtn = node.querySelector('.btn-cancel')
+
+        if(o.status==='waiting') startBtn.classList.remove('hidden')
+        if(o.status==='in_progress') readyBtn.classList.remove('hidden')
+
+        startBtn.addEventListener('click', ()=> updateStatus(o.id,'in_progress'))
+        readyBtn.addEventListener('click', ()=> updateStatus(o.id,'ready'))
+        cancelBtn.addEventListener('click', ()=> cancelOrder(o.id))
+
+        grid.appendChild(node)
+      })
+
+      if(filtered.length===0){
+        grid.innerHTML = `<div class='col-span-full p-8 text-center rounded-2xl border border-dashed border-zinc-300 bg-white text-zinc-500'>No orders match your filters.</div>`
+      }
+    }
+
+    function renderAlerts(){
+      const list = document.getElementById('alertsList')
+      list.innerHTML = ''
+      const alerts = []
+
+      const LONG_WAIT_MIN = 10
+      const longWaits = orders.filter(o=>['waiting','in_progress'].includes(o.status) && minutesAgo(o.ts) > LONG_WAIT_MIN)
+      if(longWaits.length){
+        alerts.push({ type:'warning', text:`${longWaits.length} order(s) waiting > ${LONG_WAIT_MIN} minutes` })
+      }
+
+      const largeOrders = orders.filter(o=> o.items.reduce((n,it)=>n+it.qty,0) >= 6 && o.status!=='cancelled')
+      if(largeOrders.length){
+        alerts.push({ type:'info', text:`${largeOrders.length} large group order(s) in queue` })
+      }
+
+      const cancelled = orders.filter(o=>o.status==='cancelled')
+      if(cancelled.length){
+        alerts.push({ type:'danger', text:`${cancelled.length} order(s) cancelled today` })
+      }
+
+      if(!alerts.length){
+        list.innerHTML = `<li class='text-zinc-500'>All clear. No alerts right now.</li>`
+        return
+      }
+
+      alerts.forEach(a=>{
+        const badge = a.type==='warning' ? 'bg-amber-100 text-amber-700' : a.type==='danger' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+        const li = document.createElement('li')
+        li.innerHTML = `<span class='px-2 py-1 rounded-lg text-xs ${badge} mr-2'>${a.type.toUpperCase()}</span>${a.text}`
+        list.appendChild(li)
+      })
+    }
+
+    function renderAssistant(){
+      const box = document.getElementById('assistantSuggestions')
+      box.innerHTML = ''
+      const suggestions = computeSuggestions()
+      if(!suggestions.length){
+        box.innerHTML = `<p class='text-zinc-500'>No immediate suggestions. You’re in great shape!</p>`
+        return
+      }
+      suggestions.forEach(s=>{
+        const p = document.createElement('p')
+        p.className = 'p-2 rounded-lg bg-emerald-50 border border-emerald-200'
+        p.textContent = `• ${s}`
+        box.appendChild(p)
+      })
+    }
+
+    function computeSuggestions(){
+      const tips = []
+      const queue = orders.filter(o=>['waiting','in_progress'].includes(o.status))
+      const byItem = {}
+      const byPayment = {}
+      let cancelledCount = 0
+
+      orders.forEach(o=>{
+        if(o.status==='cancelled') cancelledCount++
+        byPayment[o.payment] = (byPayment[o.payment]||0)+1
+        o.items.forEach(it=>{
+          byItem[it.name] = (byItem[it.name]||0) + it.qty
+        })
+      })
+
+      if((byItem['Croissant']||0) + (byItem['Chocolate Croissant']||0) >= 8){
+        tips.push('Consider prepping more croissants — high pastry demand (8+ in queue).')
+      }
+
+      const avgWait = queue.length ? Math.round(queue.reduce((s,o)=>s+minutesAgo(o.ts),0)/queue.length) : 0
+      if(avgWait >= 8){
+        tips.push(`Average wait is ${avgWait} min — consider prioritizing older tickets or assigning a second barista.`)
+      }
+
+      const cashShare = (byPayment['Cash']||0) / Math.max(orders.length,1)
+      if(cashShare >= 0.4){
+        tips.push('Unusual cash volume — ensure adequate change at the register.')
+      }
+
+      if(cancelledCount >= 3){
+        tips.push('Multiple cancellations — check queue accuracy and confirm names when calling orders.')
+      }
+
+      const largeOrders = orders.filter(o=> o.items.reduce((n,it)=>n+it.qty,0) >= 6 && o.status!=='cancelled')
+      if(largeOrders.length >= 2){
+        tips.push('Multiple large group orders — pre-batch popular drinks to reduce wait time.')
+      }
+
+      const readyButUnclaimed = orders.filter(o=>o.status==='ready').length
+      if(readyButUnclaimed >= 5){
+        tips.push('Many ready orders — announce pickup names more frequently.')
+      }
+
+      return tips
+    }
+
+    /**********************
+     * Mutations          *
+     **********************/
+    function findOrder(id){ return orders.find(o=>o.id===id) }
+
+    function updateStatus(id, status){
+      const o = findOrder(id)
+      if(!o) return
+      if(!STATUSES.includes(status)) return
+      if(o.status==='cancelled') return
+      o.status = status
+      render()
+    }
+
+    function cancelOrder(id){
+      const o = findOrder(id)
+      if(!o) return
+      o.status = 'cancelled'
+      render()
+    }
+
+    function addDemoOrder(){
+      orders.unshift(buildRandomOrder())
+      render()
+    }
+
+    function addDemoOrders(n){
+      for(let i=0;i<n;i++) orders.unshift(buildRandomOrder())
+      render()
+    }
+
+    /**********************
+     * Auto-Refresh       *
+     **********************/
+    let refreshTimer = null
+
+    function setAutoRefresh(sec){
+      if(refreshTimer){ clearInterval(refreshTimer); refreshTimer = null }
+      if(sec==='off' || sec===null) return
+      const ms = Number(sec)*1000
+      refreshTimer = setInterval(()=>{
+        autoProgress()
+        render()
+      }, ms)
+    }
+
+    function autoProgress(){
+      const now = Date.now()
+      orders.forEach(o=>{
+        if(o.status==='waiting'){
+          if(minutesAgo(o.ts) >= 5 || Math.random()<0.25){
+            o.status = 'in_progress'
+          }
+        } else if(o.status==='in_progress'){
+          const inProgMins = Math.floor((now - o.ts) / 60000) - 3
+          if(inProgMins >= 4 || Math.random()<0.2){
+            o.status = 'ready'
+          }
+        }
+      })
+    }
+
+    /**********************
+     * CSV Import         *
+     **********************/
+    function showImportBanner(imported, skipped, errors){
+      const banner = document.getElementById('importBanner')
+      const hasErrors = errors && errors.length
+      const summary = `Imported ${imported} order(s), skipped ${skipped} invalid row(s).`
+      const errList = hasErrors ? `<details class='mt-2'>
+        <summary class='cursor-pointer text-sm text-zinc-700'>View ${errors.length} error(s)</summary>
+        <ul class='mt-2 space-y-1 text-sm text-red-700'>
+          ${errors.map(e=>`<li><span class='font-mono'>Row ${e.row}</span>: ${e.reason}</li>`).join('')}
+        </ul>
+      </details>` : ''
+      banner.className = 'rounded-2xl border ' + (skipped? 'border-amber-200 bg-amber-50':'border-emerald-200 bg-emerald-50') + ' p-4 shadow-soft'
+      banner.innerHTML = `<div class='flex items-start justify-between gap-3'>
+        <div>
+          <div class='text-sm font-medium'>CSV Import Summary</div>
+          <div class='text-sm mt-1'>${summary}</div>
+          ${errList}
+        </div>
+        <button class='text-xs px-2 py-1 rounded-lg bg-white border border-zinc-200' onclick="document.getElementById('importBanner').className='hidden'">Dismiss</button>
+      </div>`
+    }
+
+    function handleCsvFile(file){
+      if(!file) return
+      if(!file.name.toLowerCase().endsWith('.csv')){
+        showImportBanner(0,0,[{row:'—', reason:'Please upload a .csv file.'}])
+        return
+      }
+      const reader = new FileReader()
+      reader.onload = (e)=>{
+        const text = e.target.result
+        const { rows, headerMap } = parseCSV(text)
+        if(!rows.length){
+          showImportBanner(0,0,[{row:'—', reason:'No data rows found.'}])
+          return
+        }
+        const required = ['customer_name','items','status','payment_method','timestamp','price_total']
+        const errors = []
+        let good = []
+
+        // If any required header is missing entirely, don't attempt row parsing
+        const missingHeaders = required.filter(k => headerMap[k] === undefined)
+        if(missingHeaders.length){
+          showImportBanner(0,0, missingHeaders.map(h=>({row:1, reason:`Missing required column: ${h}`})))
+          return
+        }
+
+        rows.forEach((raw, idx)=>{
+          const rowNum = idx+2 // account for header row
+          const get = (key)=> raw[headerMap[key]]
+
+          const cust = (get('customer_name')||'').trim()
+          const itemsStr = (get('items')||'').trim()
+          const statusStr = (get('status')||'').trim()
+          const payStr = (get('payment_method')||'').trim()
+          const tsStr = (get('timestamp')||'').trim()
+          const priceStr = (get('price_total')||'').trim()
+
+          if(!cust){ errors.push({row: rowNum, reason:'Missing customer_name'}); return }
+          if(!itemsStr){ errors.push({row: rowNum, reason:'Missing items'}); return }
+
+          const statusNorm = statusStr.toLowerCase().replace(/\s+/g,'_')
+          if(!['waiting','in_progress','ready','cancelled'].includes(statusNorm)){
+            errors.push({row: rowNum, reason:`Invalid status: ${statusStr}`}); return
+          }
+          const payNorm = payStr.toLowerCase()
+          const payMap = { cash:'Cash', card:'Card', upi:'UPI', wallet:'Wallet' }
+          if(!payMap[payNorm]){ errors.push({row: rowNum, reason:`Invalid payment_method: ${payStr}`}); return }
+
+          let ts = Date.parse(tsStr)
+          if(Number.isNaN(ts)) ts = Date.parse(tsStr.replace(' ', 'T'))
+          if(Number.isNaN(ts)){
+            errors.push({row: rowNum, reason:`Invalid timestamp: ${tsStr}`}); return
+          }
+
+          const price = Number(priceStr)
+          if(!Number.isFinite(price)){
+            errors.push({row: rowNum, reason:`Non-numeric price_total: ${priceStr}`}); return
+          }
+
+          const itemNames = itemsStr.split(',').map(s=>s.trim()).filter(Boolean)
+          const items = itemNames.map(name=>{
+            const allMenu = [...MENU.drinks, ...MENU.pastries, ...MENU.snacks]
+            const found = allMenu.find(m=> m.name.toLowerCase() === name.toLowerCase())
+            return { name, qty: 1, price: found? found.price : 0 }
+          })
+
+          good.push({ id: newId(), customer: cust, items, status: statusNorm, payment: payMap[payNorm], ts, price_total: price })
+        })
+
+        if(good.length===0){
+          showImportBanner(0, rows.length, errors.length? errors : [{row:'—', reason:'All rows invalid; existing data unchanged.'}])
+          return
+        }
+        orders = [...good, ...orders]
+        render()
+        showImportBanner(good.length, errors.length, errors)
+      }
+      reader.readAsText(file)
+    }
+
+    function parseCSV(text){
+      const lines = text.replace(/\r\n?/g,'\n').split('\n').filter(l=>l.trim().length>0)
+      if(lines.length===0) return { rows: [], headerMap: {} }
+      const header = csvSplit(lines[0]).map(h=>h.trim().toLowerCase())
+      const headerMap = {}
+      header.forEach((h, i)=>{ headerMap[h] = i })
+      const rows = lines.slice(1).map(line=> csvSplit(line))
+      return { rows, headerMap }
+    }
+
+    function csvSplit(line){
+      const out = []
+      let cur = ''
+      let inQ = false
+      for(let i=0;i<line.length;i++){
+        const ch = line[i]
+        if(ch==='"'){
+          if(inQ && line[i+1]==='"'){ cur += '"'; i++; }
+          else inQ = !inQ
+        } else if(ch===',' && !inQ){
+          out.push(cur)
+          cur = ''
+        } else {
+          cur += ch
+        }
+      }
+      out.push(cur)
+      return out
+    }
+
+    /**********************
+     * Events             *
+     **********************/
+    function bindUI(){
+      document.getElementById('searchInput').addEventListener('input', renderOrders)
+      document.getElementById('statusFilter').addEventListener('change', renderOrders)
+      document.getElementById('addOneBtn').addEventListener('click', ()=> addDemoOrder())
+      document.getElementById('addFiveBtn').addEventListener('click', ()=> addDemoOrders(5))
+
+      const selects = [document.getElementById('refreshSelect'), document.getElementById('refreshSelectAside')]
+      selects.forEach(sel=>{
+        sel.addEventListener('change', (e)=>{
+          const val = e.target.value
+          selects.forEach(s=> s.value = val)
+          setAutoRefresh(val)
+        })
+      })
+
+      document.getElementById('refreshAssistantBtn').addEventListener('click', renderAssistant)
+
+      const uploadBtn = document.getElementById('uploadCsvBtn')
+      const fileInput = document.getElementById('csvInput')
+      uploadBtn.addEventListener('click', ()=> fileInput.click())
+      fileInput.addEventListener('change', (e)=>{
+        const file = e.target.files && e.target.files[0]
+        handleCsvFile(file)
+        e.target.value = ''
+      })
+
+      document.getElementById('resetBtn').addEventListener('click', ()=>{
+        orders = []
+        seedOrders(defaultSeedCount)
+        render()
+        showImportBanner(0,0,[{row:'—', reason:'Data reset to default demo set.'}])
+      })
+    }
+
+    /**********************
+     * Boot               *
+     **********************/
+    ;(function init(){
+      document.getElementById('year').textContent = new Date().getFullYear()
+      seedOrders(defaultSeedCount)
+      bindUI()
+      render()
+    })()
+  </script>
+</body>
+</html>
